@@ -7,9 +7,14 @@ MAINTAINER Kyle Manna <kyle@kylemanna.com>
 
 RUN echo "http://dl-4.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
     echo "http://dl-4.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
-    apk add --update openvpn iptables bash easy-rsa openvpn-auth-pam google-authenticator pamtester && \
+    apk add --update openvpn iptables bash easy-rsa openvpn-auth-pam google-authenticator pamtester python3 && \
     ln -s /usr/share/easy-rsa/easyrsa /usr/local/bin && \
     rm -rf /tmp/* /var/tmp/* /var/cache/apk/*
+
+RUN python3 -m ensurepip && \
+    rm -r /usr/lib/python*/ensurepip && \
+    pip3 install --upgrade pip setuptools && \
+    rm -r /root/.cache
 
 # Needed by scripts
 ENV OPENVPN /etc/openvpn
@@ -23,6 +28,9 @@ VOLUME ["/etc/openvpn"]
 EXPOSE 1194/udp
 
 CMD ["ovpn_run"]
+
+ADD requirements.txt /etc
+RUN pip install -r /etc/requirements.txt
 
 ADD ./bin /usr/local/bin
 RUN chmod a+x /usr/local/bin/*
