@@ -32,8 +32,8 @@ CMD ["ovpn_run"]
 ADD requirements.txt /etc
 RUN pip install -r /etc/requirements.txt
 
-ADD ./bin /usr/local/bin
-RUN chmod a+x /usr/local/bin/*
-
 # Add support for OTP authentication using a PAM module
 ADD ./otp/openvpn /etc/pam.d/
+
+# Add required scripts
+ADD ./bin /usr/local/bin
