@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: openvpn
+spec:
+  replicas: 1
+  selector:
+    app: openvpn
+  template:
+    metadata:
+      labels:
+        app: openvpn
+    spec:
+      containers:
+        - name: openvpn
+          image: redspreadapps/kube-openvpn
+          #image: gcr.io/redspreadprod/openvpn
+          command: ["start.sh"]
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          imagePullPolicy: Always
+          args: ["google.com"]
+          ports:
+            - containerPort: 1194
+          protocol: TCP
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
