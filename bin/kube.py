@@ -8,6 +8,13 @@ import pykube
 
 ALLOCATED_ERR = "provided IP is already allocated"
 
+VPN_HOST_ENV = "OVPN_HOST"
+DNS_ENV = "KUBE_DNS"
+DNS_SEARCH_ENV = "KUBE_DNS_SEARCH"
+SVC_NETWORK_ENV = "KUBE_SVC_NET"
+SVC_MASK_ENV = "KUBE_SVC_MASK"
+
+
 def base_obj(kind, namespace, name, api_version="v1"):
     """
     Creates an object that can be used in Pykube requests
@@ -74,7 +81,6 @@ def test_service(kube_api, target_ip="", ignore_allocated=False):
         err_str = str(err)
         if err_str.endswith(ALLOCATED_ERR) and ignore_allocated:
             return IPAddress(target_ip)
-        print("Error with %s: %s" % (str(target_ip), err_str))
         return False
 
 
@@ -157,23 +163,27 @@ def find_services_cidr(kube_api):
     :param kube_api: Pykube API Object
     :return: IPNetwork if can be determined. Otherwise, returns False.
     """
-    provider = detect_cloud_provider(kube_api)
-    if provider == "gce":
-        # get sample IP to determine range
-        svc_ip = test_service(kube_api)
-        if svc_ip:
-            # GKE uses IPs that match the pattern "10.*.240.0/20"
-            ip_range = "10.%d.240.0/20" % svc_ip.words[1]
-            return check_service_iprange(kube_api, ip_range)
-    elif provider == "aws":
-        ip_range = False
-        # kube-aws
-        if not ip_range:
-            ip_range = check_service_iprange(kube_api, "10.3.0.0/24")
-        # kube-up.sh AWS
-        if not ip_range:
-            ip_range = check_service_iprange(kube_api, "10.0.0.0/16")
-        return ip_range
+    try:
+        provider = detect_cloud_provider(kube_api)
+        if provider == "gce":
+            # get sample IP to determine range
+            svc_ip = test_service(kube_api)
+            if svc_ip:
+                # GKE uses IPs that match the pattern "10.*.240.0/20"
+                ip_range = "10.%d.240.0/20" % svc_ip.words[1]
+                return check_service_iprange(kube_api, ip_range)
+        elif provider == "aws":
+            ip_range = False
+            # kube-aws
+            if not ip_range:
+                ip_range = check_service_iprange(kube_api, "10.3.0.0/24")
+            # kube-up.sh AWS
+            if not ip_range:
+                ip_range = check_service_iprange(kube_api, "10.0.0.0/16")
+            return ip_range
+        print("Cloud provider '%s' is not supported" % provider)
+    except pykube.exceptions.HTTPError as err:
+        print("Encountered error: %s" % str(err))
     return False
 
 
@@ -186,8 +196,59 @@ def network_and_mask(cidr):
     net = IPNetwork(cidr)
     return str(net.network), str(net.netmask)
 
-print("Connecting to KubeAPI")
-KUBE = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
 
-print("Determining Service Range")
-print(find_services_cidr(KUBE))
+def get_resolv():
+    """
+    Reads '/etc/resolv.conf' and returns a dictionary with it's contents
+    :return: dict with resolve.conf directive as key
+    """
+    contents = dict()
+    try:
+        with open('/etc/resolv.conf', 'r') as resolvconf:
+            for line in resolvconf.readlines():
+                parsed_line = line.split(maxsplit=1)
+                if len(parsed_line) > 1:
+                    val = parsed_line[1].rstrip("\n")
+                    contents[parsed_line[0]] = val
+    except IOError:
+        pass
+    return contents
+
+
+def export_vars(kube_api):
+    """
+    String to be used with bash's eval which sets environment variables
+    based on detecting details about the Pods network. The values
+    of environment variables that are already set are used.
+    :param kube_api: Pykube API Object
+    :return: String to be eval'd by bash
+    """
+    resolv = get_resolv()
+    out = str()
+    dns = os.environ.get(DNS_ENV)
+    if dns is None or len(dns) == 0:
+        dns = resolv.get("nameserver")
+        if dns is not None:
+            out += "export %s=\"%s\"\n" % (DNS_ENV, dns)
+
+    search = os.environ.get(DNS_SEARCH_ENV)
+    if search is None or len(search) == 0:
+        search = resolv.get("search")
+        if search is not None:
+            out += "export %s=\"%s\"\n" % (DNS_SEARCH_ENV, search)
+
+    cidr = find_services_cidr(kube_api)
+    if cidr:
+        net, mask = network_and_mask(cidr)
+        service_net = os.environ.get(SVC_NETWORK_ENV)
+        if service_net is None or len(service_net) == 0:
+            out += "export %s=\"%s\"\n" % (SVC_NETWORK_ENV, net)
+        service_mask = os.environ.get(SVC_MASK_ENV)
+        if service_mask is None or len(service_mask) == 0:
+            out += "export %s=\"%s\"\n" % (SVC_MASK_ENV, mask)
+    return out
+
+
+if __name__ == '__main__':
+    KUBE = pykube.HTTPClient(pykube.KubeConfig.from_service_account())
+    print(export_vars(KUBE))
