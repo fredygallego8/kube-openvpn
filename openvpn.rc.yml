@@ -21,9 +21,11 @@ spec:
               add:
                 - NET_ADMIN
           imagePullPolicy: Always
-          args: ["google.com"]
           ports:
             - containerPort: 1194
-          protocol: TCP
+              protocol: TCP
+          env:
+            - name: OVPN_HOST
+              value: cluster.joopal
       restartPolicy: Always
       dnsPolicy: ClusterFirst

@@ -6,7 +6,6 @@ spec:
   ports:
     - name: openvpn
       port: 1194
-      targetPort: 1194
   selector:
     app: openvpn
   type: LoadBalancer
