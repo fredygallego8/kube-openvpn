@@ -127,9 +127,14 @@ def detect_cloud_provider(kube_api):
     """
     host = socket.gethostname()
     namespace = pod_namespace()
-    node_name = get_pod(kube_api, namespace, host).obj["spec"]["nodeName"]
-    provider_id = str(get_node(kube_api, node_name).obj["spec"]["providerID"])
-    return provider_id.split("://", 1)[0]
+    try:
+        node_name = get_pod(kube_api, namespace, host).obj["spec"]["nodeName"]
+        if node_name == "minikubevm":
+            return "minikube"
+        provider_id = str(get_node(kube_api, node_name).obj["spec"]["providerID"])
+        return provider_id.split("://", 1)[0]
+    except KeyError:
+        return None
 
 
 def check_service_iprange(kube_api, cidr):
@@ -181,6 +186,8 @@ def find_services_cidr(kube_api):
             if not ip_range:
                 ip_range = check_service_iprange(kube_api, "10.0.0.0/16")
             return ip_range
+        elif provider == "minikube":
+            return check_service_iprange(kube_api, "10.0.0.1/24")
         print("Cloud provider '%s' is not supported" % provider)
     except pykube.exceptions.HTTPError as err:
         print("Encountered error: %s" % str(err))
