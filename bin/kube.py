@@ -10,6 +10,7 @@ ALLOCATED_ERR = "provided IP is already allocated"
 
 VPN_HOST_ENV = "OVPN_HOST"
 DNS_ENV = "KUBE_DNS"
+DNS_SEARCH_ARR_ENV = "DNS_SEARCH_ARR"
 DNS_SEARCH_ENV = "KUBE_DNS_SEARCH"
 SVC_NETWORK_ENV = "KUBE_SVC_NET"
 SVC_MASK_ENV = "KUBE_SVC_MASK"
@@ -238,11 +239,12 @@ def export_vars(kube_api):
         if dns is not None:
             out += "export %s=\"%s\"\n" % (DNS_ENV, dns)
 
-    search = os.environ.get(DNS_SEARCH_ENV)
-    if search is None or len(search) == 0:
-        search = resolv.get("search")
-        if search is not None:
-            out += "export %s=\"%s\"\n" % (DNS_SEARCH_ENV, search)
+    search_arr = os.environ.get(DNS_SEARCH_ARR_ENV)
+    if search_arr is None or len(search_arr) == 0:
+        search = os.environ.get(DNS_SEARCH_ENV)
+        if search is None or len(search) == 0:
+            search = resolv.get("search")
+        out += "export %s=(\t%s\t)\n" % (DNS_SEARCH_ARR_ENV, search)
 
     cidr = find_services_cidr(kube_api)
     if cidr:

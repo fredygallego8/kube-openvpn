@@ -15,20 +15,23 @@ if [ ! -e "OPENVPN_CFG" ]; then
 
     # Generate OpenVPN config
     if [ -n "$OVPN_HOST" ]; then
-        ovpn_genconfig -u tcp://$OVPN_HOST $DNS_ARG $ROUTE_ARG $DNS_SEARCH_ARG
+        ovpn_genconfig -u tcp://$OVPN_HOST $DNS_ARG $ROUTE_ARG
     else
         printf "ERROR: The environment variable \$OVPN_HOST must be set to the hostname desired for the VPN.\n" 1>&2
         exit 1
     fi
 
-    if [ -n "$KUBE_DNS_SEARCH" ]; then
-        printf "push \"dhcp-option SEARCH $KUBE_DNS_SEARCH\"\n" >> $OPENVPN_CFG
+    if [ -n "$DNS_SEARCH_ARR" ]; then
+        for i in ${DNS_SEARCH_ARR[@]}; do
+            printf "push \"dhcp-option DOMAIN-SEARCH $i\"\n" >> $OPENVPN_CFG
+        done
     fi
 
     if [ -n "$KUBE_SVC_NET" -a -n "$KUBE_SVC_MASK" ]; then
         printf "push route $KUBE_SVC_NET $KUBE_SVC_MASK\n" >> $OPENVPN_CFG
     fi
 
+    echo "OpenVPN Configuration:"
     cat $OPENVPN_CFG
 fi
 
