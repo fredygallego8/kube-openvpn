@@ -26,6 +26,14 @@ spec:
               protocol: TCP
           env:
             - name: OVPN_HOST
-              value: cluster.joopal
+              value:
+            - name: KUBE_DNS
+              value:
+            - name: KUBE_DNS_SEARCH
+              value:
+            - name: KUBE_SVC_NET
+              value:
+            - name: KUBE_SVC_MASK
+              value:
       restartPolicy: Always
       dnsPolicy: ClusterFirst

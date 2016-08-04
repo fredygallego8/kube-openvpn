@@ -3,6 +3,8 @@
 
 import os
 import socket
+from urllib.request import urlopen, Request
+import yaml
 from netaddr import IPNetwork, IPAddress
 import pykube
 
@@ -175,8 +177,8 @@ def find_services_cidr(kube_api):
             # get sample IP to determine range
             svc_ip = test_service(kube_api)
             if svc_ip:
-                # GKE uses IPs that match the pattern "10.*.240.0/20"
-                ip_range = "10.%d.240.0/20" % svc_ip.words[1]
+                # Use GCE metadata service to lookup service range
+                ip_range = gce_kubeenv()["SERVICE_CLUSTER_IP_RANGE"]
                 return check_service_iprange(kube_api, ip_range)
         elif provider == "aws":
             ip_range = False
@@ -221,6 +223,18 @@ def get_resolv():
     except IOError:
         pass
     return contents
+
+
+def gce_kubeenv():
+    """
+    Uses the Google Compute Engine Metadata service to retrieve information about the cluster.
+    :return: Dictionary of cluster specific information.
+    """
+    url = "http://metadata/computeMetadata/v1/instance/attributes/kube-env"
+    headers = {"Metadata-Flavor": "Google"}
+    request = Request(url, headers=headers)
+    with urlopen(request) as stream:
+        return yaml.load(stream)
 
 
 def export_vars(kube_api):
